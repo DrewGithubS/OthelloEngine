@@ -1,11 +1,7 @@
-#ifndef BOARD_CPP
-#define BOARD_CPP
-
 #include <iostream>
 #include "MoveUndo.h"
 #include "Board.h"
-#include "BoardMoveGen.cpp"
-#include "MoveList.cpp"
+#include "MoveList.h"
 
 
 uint8_t countBitsSet(uint64_t in) {
@@ -18,14 +14,14 @@ uint8_t countBitsSet(uint64_t in) {
 }
 
 Board::Board() {
-    readFromString("8/8/8/3WB3/3BW3/8/8/8 1 0");
+    readFromString(const_cast<char*>("8/8/8/3WB3/3BW3/8/8/8 1 0"));
 }
 Board::Board(char * position) {
     readFromString(position);
 }
 
 bool Board::squareIsOccupied(uint8_t square) {
-    return (occupied) >> square & 1;
+    return (pos.occupied) >> square & 1;
 }
 
 // Assumes that a piece is on the square.
@@ -71,8 +67,8 @@ void Board::print(bool extraInfo) {
     std::cout << "\nWhite Pieces: " << (int) countBitsSet(pos.team[WHITE]) << std::endl;
     std::cout << "Black Pieces: " << (int) countBitsSet(pos.team[BLACK]) << std::endl;
     if(extraInfo) {
-        std::cout << "Move: " << (turn ? "Black\n" : "White\n");
-        std::cout << "Last Move Passed: " << lastMoveSkipped << std::endl;
+        std::cout << "Move: " << (pos.turn ? "Black\n" : "White\n");
+        std::cout << "Last Move Passed: " << pos.lastMoveSkipped << std::endl;
     }
 }
 
@@ -133,37 +129,41 @@ void Board::readFromString(char * posString) {
         charCount++;
     }
     // At this point the charCount is already at the next number
-    turn = posString[charCount] == '1';
+    pos.turn = posString[charCount] == '1';
     // Move charCount to the next number
     charCount += 2;
-    lastMoveSkipped = posString[charCount] == '1';
+    pos.lastMoveSkipped = posString[charCount] == '1';
 
-    occupied = pos.team[turn] | pos.team[!turn];
+    pos.occupied = pos.team[pos.turn] | pos.team[!pos.turn];
 }
 
 bool Board::doMove(int8_t square) {
     // If the player is passing
     if(square == -1) {
-        if(lastMoveSkipped) {
-            return true;
-        }
-        lastMoveSkipped = true;
-        turn = !turn;
-        return false;
+        // if(pos.lastMoveSkipped) {
+        //     return true;
+        // }
+        // pos.lastMoveSkipped = true;
+        // pos.turn = !pos.turn;
+        // return false;
+
+        // The code above is what this is doing, but this is branchless
+        pos.turn = !pos.turn;
+        return !(pos.lastMoveSkipped = !pos.lastMoveSkipped);
     }
 
     turnStonesFromMove(square);
 
-    pos.team[BLACK] |= ((ONE64 & turn) << square);
-    pos.team[WHITE] |= ((ONE64 & !turn) << square);
+    pos.team[BLACK] |= ((ONE64 & pos.turn) << square);
+    pos.team[WHITE] |= ((ONE64 & !pos.turn) << square);
 
     // Set the turn to the other player
-    turn = !turn;
+    pos.turn = !pos.turn;
 
     // This move was not passed.
-    lastMoveSkipped = false;
+    pos.lastMoveSkipped = false;
 
-    occupied = pos.team[turn] | pos.team[!turn];
+    pos.occupied = pos.team[pos.turn] | pos.team[!pos.turn];
 
     // The game is not over
     return false;
@@ -174,5 +174,3 @@ int8_t Board::getWinner() {
     uint8_t whiteCount = countBitsSet(pos.team[WHITE]);
     return blackCount > whiteCount ? -1 : (whiteCount > blackCount ? 1 : 0);
 }
-
-#endif

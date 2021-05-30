@@ -1,19 +1,20 @@
-#include "Board.h"
 #include <cstdlib>
 
-#define shift1 1
-#define shift2 9
-#define shift3 8
-#define shift4 7
+#include "Board.h"
 
-#define MACROmask1 0x7F7F7F7F7F7F7F7F
-#define MACROmask2 0xFEFEFEFEFEFEFEFE
-#define MACROmask3 0x007F7F7F7F7F7F7F
-#define MACROmask4 0xFEFEFEFEFEFEFE00
-#define MACROmask5 0xFFFFFFFFFFFFFFFF
-#define MACROmask6 0xFFFFFFFFFFFFFFFF
-#define MACROmask7 0x00FEFEFEFEFEFEFE
-#define MACROmask8 0x7F7F7F7F7F7F7F00
+const uint8_t shift1 = 1;
+const uint8_t shift2 = 9;
+const uint8_t shift3 = 8;
+const uint8_t shift4 = 7;
+
+const uint64_t MACROmask1 = 0x7F7F7F7F7F7F7F7F;
+const uint64_t MACROmask2 = 0xFEFEFEFEFEFEFEFE;
+const uint64_t MACROmask3 = 0x007F7F7F7F7F7F7F;
+const uint64_t MACROmask4 = 0xFEFEFEFEFEFEFE00;
+const uint64_t MACROmask5 = 0xFFFFFFFFFFFFFFFF;
+const uint64_t MACROmask6 = 0xFFFFFFFFFFFFFFFF;
+const uint64_t MACROmask7 = 0x00FEFEFEFEFEFEFE;
+const uint64_t MACROmask8 = 0x7F7F7F7F7F7F7F00;
 
 //  Original Code
 // This is the slightly more readable version, the version in use is the same thing but without loops and with constants.
@@ -148,12 +149,12 @@
 // } 
 
 void Board::getAllLegalMoves(uint8_t ** mlPointer) {
-    uint64_t friendlyStones = pos.team[turn];
-    uint64_t enemyStones = pos.team[!turn];
+    uint64_t friendlyStones = pos.team[pos.turn];
+    uint64_t enemyStones = pos.team[!pos.turn];
     // A temporary holder for the moves in each direction
     register uint64_t tempMoves;
     // Squares that don't have a stone on them.
-    uint64_t emptySquares = ~occupied;
+    uint64_t emptySquares = ~pos.occupied;
     uint64_t output = 0;
 
     register uint64_t fastMask;
@@ -247,8 +248,8 @@ void Board::getAllLegalMoves(uint8_t ** mlPointer) {
 void Board::turnStonesFromMove(uint8_t square) {
     // This assumes the piece is already placed, it will not
     // placed the piece or turn the pieces.
-    uint64_t friendlyStones = pos.team[turn];
-    uint64_t enemyStones = pos.team[!turn];
+    uint64_t friendlyStones = pos.team[pos.turn];
+    uint64_t enemyStones = pos.team[!pos.turn];
     register uint64_t tempOutput;
     uint64_t piecePlaced = ONE64 << square;
     uint64_t ifCaptured;

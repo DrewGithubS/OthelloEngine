@@ -3,13 +3,18 @@
 
 #include <cstdint>
 
-#define BLACK 1
-#define WHITE 0
+const bool BLACK = 1;
+const bool WHITE = 0;
 
 static const uint64_t ONE64 = 1;
 
 typedef struct {
     uint64_t team[2];
+    uint64_t occupied;
+    bool lastMoveSkipped;
+    bool turn;
+    // Not used
+    uint8_t pad[6];
 } Position;
 
 class MoveList;
@@ -18,9 +23,6 @@ class MoveUndo;
 class Board {
 public:
     Position pos;
-    bool lastMoveSkipped;
-    bool turn;
-    uint64_t occupied;
 
     Board();
     Board(char * position);
