@@ -1,7 +1,6 @@
 #include <iostream>
-#include "MoveUndo.h"
+
 #include "Board.h"
-#include "MoveList.h"
 
 
 uint8_t countBitsSet(uint64_t in) {

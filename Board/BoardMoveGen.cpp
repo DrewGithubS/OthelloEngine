@@ -2,20 +2,6 @@
 
 #include "Board.h"
 
-const uint8_t shift1 = 1;
-const uint8_t shift2 = 9;
-const uint8_t shift3 = 8;
-const uint8_t shift4 = 7;
-
-const uint64_t MACROmask1 = 0x7F7F7F7F7F7F7F7F;
-const uint64_t MACROmask2 = 0xFEFEFEFEFEFEFEFE;
-const uint64_t MACROmask3 = 0x007F7F7F7F7F7F7F;
-const uint64_t MACROmask4 = 0xFEFEFEFEFEFEFE00;
-const uint64_t MACROmask5 = 0xFFFFFFFFFFFFFFFF;
-const uint64_t MACROmask6 = 0xFFFFFFFFFFFFFFFF;
-const uint64_t MACROmask7 = 0x00FEFEFEFEFEFEFE;
-const uint64_t MACROmask8 = 0x7F7F7F7F7F7F7F00;
-
 //  Original Code
 // This is the slightly more readable version, the version in use is the same thing but without loops and with constants.
 // Using constants allows the CPU to spend less time with memory and more time doing actual math.
@@ -148,7 +134,7 @@ const uint64_t MACROmask8 = 0x7F7F7F7F7F7F7F00;
 //     pos.team[WHITE] ^= output;
 // } 
 
-void Board::getAllLegalMoves(uint8_t ** mlPointer) {
+void Board::getAllLegalMoves(int8_t ** mlPointer) {
     uint64_t friendlyStones = pos.team[pos.turn];
     uint64_t enemyStones = pos.team[!pos.turn];
     // A temporary holder for the moves in each direction
