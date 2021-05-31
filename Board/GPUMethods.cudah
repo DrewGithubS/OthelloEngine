@@ -1,9 +1,0 @@
-__device__ void getAllLegalMoves_d(int8_t ** mlPointer, uint64_t friendlyStones, uint64_t enemyStones, bool turn);
-
-__device__ void turnStonesFromMove_d(int8_t square, uint64_t * friendlyStones, uint64_t * enemyStones);
-
-__device__ bool doMove_d(int8_t square, uint64_t * friendlyStones, uint64_t * enemyStones, bool * lastMoveSkipped, bool * turn);
-
-__device__ void doPerft_d(uint64_t team[2], bool lastMoveSkipped, bool turn, int32_t depth, uint64_t * output);
-
-__global__ void doPerftsOnGPU(uint64_t ** teams, bool * lastMovesSkipped, bool * turns, int32_t depth, uint64_t * outputs, uint64_t threads);
