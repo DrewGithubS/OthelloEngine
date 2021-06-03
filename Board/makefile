@@ -1,5 +1,5 @@
 Exec = perft
-OPTS = -O3 -std=c++11 -g
+OPTS = -O3 -std=c++11 -g -pthread
 
 objects := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 

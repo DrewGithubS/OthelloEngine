@@ -119,10 +119,6 @@ void * threadDoPerft(void * in) {
 
 void runMulti() {
     // Multithreaded approach to perft.
-    uint8_t THREADS = 4;
-
-    pthread_t * threadList = (pthread_t *) malloc(sizeof(pthread_t) * THREADS);
-
     Board board;
     int8_t moveList[MAXPOSSIBLEMOVES];
     int8_t * last = &moveList[0];
@@ -134,29 +130,24 @@ void runMulti() {
 
     uint8_t movesLength = last - moveList;
 
+    pthread_t * threadList = (pthread_t *) malloc(sizeof(pthread_t) * movesLength);
     Input ** inputList = (Input **) malloc(movesLength * sizeof(Input *));
     uint64_t ** positionCountList = (uint64_t **) calloc(movesLength, sizeof(uint64_t *));
 
-    uint8_t index;
     // For each set of threads
-    for(int i = 0; i < (movesLength + THREADS)/THREADS; i++) {
-        for(int j = 0; j < THREADS && j < movesLength; j++) {
-            index = i * THREADS + j;
-            if(index < movesLength) {
-                positionCountList[index] = new uint64_t;
-                inputList[index] = new Input();
-                inputList[index]->board = new Board();
-                inputList[index]->depth = depth;
-                inputList[index]->positions = positionCountList[index];
-                inputList[index]->board->doMove(moveList[index]);
-                pthread_create(&threadList[j], NULL, &threadDoPerft, (void *) inputList[index]);
-            }
-        }
-        for(int j = 0; j < THREADS; j++) {
-            void * pv;
-            pthread_join(threadList[j], &pv);
-            total += *positionCountList[j];
-        }
+    for(int i = 0; i < movesLength; i++) {
+        positionCountList[i] = new uint64_t;
+        inputList[i] = new Input();
+        inputList[i]->board = new Board();
+        inputList[i]->depth = depth;
+        inputList[i]->positions = positionCountList[i];
+        inputList[i]->board->doMove(moveList[i]);
+        pthread_create(&threadList[i], NULL, &threadDoPerft, (void *) inputList[i]);
+    }
+    for(int j = 0; j < movesLength; j++) {
+        void * pv;
+        pthread_join(threadList[j], &pv);
+        total += *positionCountList[j];
     }
     auto end = std::chrono::high_resolution_clock::now();
     uint64_t time = (uint64_t) (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count();
