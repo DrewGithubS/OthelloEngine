@@ -1,6 +1,8 @@
 Exec = perft
 OPTS = -O3 -g
 
+GCC = gcc
+
 objects := $(patsubst %.c,%.o,$(wildcard *.c))
 
 .PHONY: all
@@ -11,11 +13,11 @@ check:
 	echo Objects are $(objects)
 
 $(objects): %.o: %.c *.h
-	$(CXX) -c $(OPTS) $< -o $@
+	$(GCC) -c $(OPTS) $< -o $@
 	
 
 $(Exec): $(objects) $(cu_objects)
-	$(CXX) $(OPTS) $(objects) -o $(Exec)
+	$(GCC) $(OPTS) $(objects) -o $(Exec)
 
 .PHONY: clean
 clean:

@@ -1,8 +1,8 @@
-#include <cstdlib>
-#include <iostream>
-#include <chrono>
+#include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
-#include <cstring>
+#include <time.h>
+#include <string.h>
 
 #include "Board.h"
 
@@ -86,22 +86,53 @@ void doPerft(Position * pos, int32_t depth, uint64_t * output) {
     }
 }
 
+// void doPerftIterative(Position * pos, const int32_t depth, uint64_t * output) {
+//     int8_t moveList[depth][MAXPOSSIBLEMOVES];
+//     int8_t * last[depth];
+//     Position undo[depth];
+//     int32_t depthTemp = 0;
+//     while(1) {
+//         if(depthTemp == 0)
+//             getAllLegalMoves(pos, &last[depth]);
+//             if(depthTemp == depth) {
+//                 (*output) += last - moveList;
+//                 return;
+//             }
+//             undo[depthTemp] = *pos;
+            
+//         } else {
+//             for(int i = 0; i < (last[depth] - moveList[depth]); ++i) {
+//                 // This just readies the CPU to access pos. Adds ~4m Nodes/s
+//                 __builtin_prefetch(pos);
+//                 if(doMove(pos, moveList[i])) {
+//                     *pos = undo;
+//                     ++(*output);
+//                     return;
+//                 }
+//                 doPerft(pos, depth-1, output);
+//                 *pos = undo;
+//             }
+//         }
+//     }
+// }
+
 void runSingle() {
-    Position pos = createBoard();
-    std::cout << "Depth: " << depth << std::endl;
+    Position pos = createBoard("8/8/8/3WB3/3BW3/8/8/8 1 0");
+    printf("Depth: %d", depth);
 
     print(&pos, true);
 
     uint64_t total = 0;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    clock_t timeBegin = clock();
 
     doPerft(&pos, depth, &total);
     
-    auto end = std::chrono::high_resolution_clock::now();
-    uint64_t time = (uint64_t) (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count();
-    printf("%llu nodes searched in %llu microseconds.", total, time);
-    std::cout << " That's about " << (float(total) / (float(time) / float(1000000))) << " nodes per second." << std::endl;
+    clock_t timeEnd = clock();
+    double timeTaken = ((double)(timeEnd - timeBegin))/CLOCKS_PER_SEC;
+    timeTaken *= 1000000;
+    printf("%llu nodes searched in %.0lf microseconds.", total, timeTaken);
+    printf(" That's about %.0lf nodes per second.", 1000000 * ((double) total) / (timeTaken));
 }
 
 
@@ -120,13 +151,13 @@ void * threadDoPerft(void * in) {
 void runMulti() {
     // Multithreaded approach to perft.
 
-    Position pos = createBoard();
+    Position pos = createBoard("8/8/8/3WB3/3BW3/8/8/8 1 0");
     int8_t moveList[MAXPOSSIBLEMOVES];
     int8_t * last = &moveList[0];
     uint64_t total = 0;
     depth--;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    clock_t timeBegin = clock();
     getAllLegalMoves(&pos, &last);
 
     uint8_t movesLength = last - moveList;
@@ -137,8 +168,6 @@ void runMulti() {
 
     // For each set of threads
     for(int i = 0; i < movesLength; ++i) {
-        positionCountList[i] = new uint64_t;
-        inputList[i] = new Input();
         inputList[i]->pos = &pos;
         inputList[i]->depth = depth;
         inputList[i]->positions = positionCountList[i];
@@ -150,10 +179,11 @@ void runMulti() {
         pthread_join(threadList[j], &pv);
         total += *positionCountList[j];
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    uint64_t time = (uint64_t) (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count();
-    printf("%llu nodes searched in %llu microseconds.", total, time);
-    std::cout << "That's about " << (float(total) / (float(time) / float(1000000))) << " nodes per second." << std::endl;
+    clock_t timeEnd = clock();
+    double timeTaken = ((double)(timeEnd - timeBegin))/CLOCKS_PER_SEC;
+    timeTaken *= 1000000;
+    printf("%llu nodes searched in %lf microseconds.", total, timeTaken);
+    printf(" That's about %lf nodes per second.", ((double) total) / (timeTaken));
 }
 
 int main(int argc, char **argv) {
