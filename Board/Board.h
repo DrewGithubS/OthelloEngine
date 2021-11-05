@@ -28,7 +28,6 @@ bool squareIsOccupied(uint8_t square);
 bool getPieceAt(Position * pos, uint8_t square);
 void print(Position * pos, bool extraInfo = false);
 Position readFromString(char * position);
-void getAllLegalMovesASM(Position * pos, int8_t ** mlPointer);
 void getAllLegalMoves(Position * pos, int8_t ** mlPointer);
 void turnStonesFromMove(Position * pos, uint8_t square);
 bool doMove(Position * pos, int8_t square);
