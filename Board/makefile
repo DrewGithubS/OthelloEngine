@@ -1,7 +1,7 @@
 Exec = perft
-OPTS = -O3 -std=c++11 -g -pthread
+OPTS = -O3 -g
 
-objects := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
+objects := $(patsubst %.c,%.o,$(wildcard *.c))
 
 .PHONY: all
 all: $(Exec)
@@ -10,7 +10,7 @@ all: $(Exec)
 check:
 	echo Objects are $(objects)
 
-$(objects): %.o: %.cpp *.h
+$(objects): %.o: %.c *.h
 	$(CXX) -c $(OPTS) $< -o $@
 	
 
