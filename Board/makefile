@@ -1,5 +1,5 @@
-Exec = perft
-OPTS = -O3 -g
+Exec = main
+OPTS = -Ofast -g
 
 GCC = gcc
 

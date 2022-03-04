@@ -24,6 +24,7 @@ bool getPieceAt(Position * pos, uint8_t square);
 void print(Position * pos, bool extraInfo);
 Position readFromString(char * position);
 void getAllLegalMoves(Position * pos, int8_t ** mlPointer);
+uint64_t getAllLegalMovesMask(Position * pos);
 void turnStonesFromMove(Position * pos, uint8_t square);
 bool doMove(Position * pos, int8_t square);
 int8_t getWinner(Position * pos);

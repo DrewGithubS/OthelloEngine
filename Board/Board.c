@@ -3,15 +3,18 @@
 
 #include "Board.h"
 
+#define shiftR(var) (var | (var >> shift & fastMask))
+#define shiftL(var) (var | (var << shift & fastMask))
+
 const bool BLACK = 1;
 const bool WHITE = 0;
 const uint64_t ONE64 = 1;
 
-uint8_t countBitsSet(uint64_t in) {
+inline uint8_t countBitsSet(uint64_t in) {
     return (uint8_t) __builtin_popcountll(in);
 }
 
-Position createBoard(char * position) {
+inline Position createBoard(char * position) {
     return readFromString(position);
 }
 
@@ -83,12 +86,12 @@ Position readFromString(char * posString) {
     return pos;
 }
 
-bool squareIsOccupied(Position * pos, uint8_t square) {
+inline bool squareIsOccupied(Position * pos, uint8_t square) {
     return (pos->occupied) >> square & 1;
 }
 
 // Assumes that a piece is on the square.
-bool getPieceAt(Position * pos, uint8_t square) {
+inline bool getPieceAt(Position * pos, uint8_t square) {
     return (pos->team[BLACK]) >> square & 1;
 }
 
@@ -120,141 +123,119 @@ void print(Position * pos, bool extraInfo) {
         printf("|\n");
     }
     printf("  +––––+––––+––––+––––+––––+––––+––––+––––+\n");
-    char chars[8] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
+    char chars[8] = "ABCDEFGH";
     printf("    ");
     for(int i = 0; i < 8; ++i) {
         printf("%c    ", chars[i]);
     }
-    printf("\nWhite Pieces: %d\n", (int) countBitsSet(pos->team[WHITE]));
-    printf("Black Pieces: %d\n", (int) countBitsSet(pos->team[BLACK]));
+    printf("\n");
     if(extraInfo) {
+        printf("White Pieces: %d\n", (int) countBitsSet(pos->team[WHITE]));
+        printf("Black Pieces: %d\n", (int) countBitsSet(pos->team[BLACK]));
         printf("Move: %s", (pos->turn ? "Black\n" : "White\n"));
-        printf("Last Move Passed: %d", pos->lastMoveSkipped);
+        printf("Last Move Passed: %d\n", pos->lastMoveSkipped);
     }
 }
 
-int8_t getWinner(Position * pos) {
+inline int8_t getWinner(Position * pos) {
     uint8_t blackCount = countBitsSet(pos->team[BLACK]);
     uint8_t whiteCount = countBitsSet(pos->team[WHITE]);
     return blackCount > whiteCount ? -1 : (whiteCount > blackCount ? 1 : 0);
 }
 
-// These functions need to be fast.
-void getAllLegalMoves(Position * pos, int8_t ** mlPointer) {
-
-    // Used later in the function
-    bool temp;
-    int8_t * originalPointer = *mlPointer;
-
+__attribute__((always_inline)) uint64_t getAllLegalMovesMask(Position * pos) {
     // Used in masking
     const uint64_t friendlyStones = pos->team[pos->turn];
     const uint64_t enemyStones = pos->team[!pos->turn];
     // Squares that don't have a stone on them.
     const uint64_t emptySquares = ~pos->occupied;
     uint64_t output = 0;
-    // A temporary holder forthe moves in each direction
-    uint64_t tempMoves;
+    // A temporary holder for the moves in each direction
+    register uint64_t tempMoves asm("x9");
     uint64_t fastMask;
-    const uint8_t shift0 = 1;
-    const uint8_t shift1 = 9;
-    const uint8_t shift2 = 8;
-    const uint8_t shift3 = 7;
-    const uint64_t MACROMASKS0 = 0x7F7F7F7F7F7F7F7F;
-    const uint64_t MACROMASKS1 = 0xFEFEFEFEFEFEFEFE;
-    const uint64_t MACROMASKS2 = 0x007F7F7F7F7F7F7F;
-    const uint64_t MACROMASKS3 = 0xFEFEFEFEFEFEFE00; 
-    const uint64_t MACROMASKS4 = 0xFFFFFFFFFFFFFFFF;
-    const uint64_t MACROMASKS5 = 0xFFFFFFFFFFFFFFFF;
-    const uint64_t MACROMASKS6 = 0x00FEFEFEFEFEFEFE;
-    const uint64_t MACROMASKS7 = 0x7F7F7F7F7F7F7F00;
 
-    // Each set is 24 ASM instructions in x86
-    fastMask = MACROMASKS0 & enemyStones;
-    tempMoves = (friendlyStones >> shift0 & fastMask);
-    tempMoves |= (tempMoves >> shift0 & fastMask);
-    tempMoves |= (tempMoves >> shift0 & fastMask);
-    tempMoves |= (tempMoves >> shift0 & fastMask);
-    tempMoves |= (tempMoves >> shift0 & fastMask);
-    tempMoves |= (tempMoves >> shift0 & fastMask);
-    output |= (tempMoves >> shift0 & MACROMASKS0) & emptySquares;
+    // Each set is ~26 ASM instructions in x86
+    register int8_t shift asm("x10");
+    shift = 1;
+    register uint64_t MACROMASK asm("x11");
+    MACROMASK = 0x7F7F7F7F7F7F7F7F;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones >> shift & fastMask);
+    tempMoves = shiftR(shiftR(shiftR(shiftR(shiftR(tempMoves)))));
+    output |= (tempMoves >> shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS1 & enemyStones;
-    tempMoves = (friendlyStones << shift0 & fastMask);
-    tempMoves |= (tempMoves << shift0 & fastMask);
-    tempMoves |= (tempMoves << shift0 & fastMask);
-    tempMoves |= (tempMoves << shift0 & fastMask);
-    tempMoves |= (tempMoves << shift0 & fastMask);
-    tempMoves |= (tempMoves << shift0 & fastMask);
-    output |= (tempMoves << shift0 & MACROMASKS1) & emptySquares;
+    MACROMASK = 0xFEFEFEFEFEFEFEFE;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones << shift & fastMask);
+    tempMoves = shiftL(shiftL(shiftL(shiftL(shiftL(tempMoves)))));
+    output |= (tempMoves << shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS2 & enemyStones;
-    tempMoves = (friendlyStones >> shift1 & fastMask);
-    tempMoves |= (tempMoves >> shift1 & fastMask);
-    tempMoves |= (tempMoves >> shift1 & fastMask);
-    tempMoves |= (tempMoves >> shift1 & fastMask);
-    tempMoves |= (tempMoves >> shift1 & fastMask);
-    tempMoves |= (tempMoves >> shift1 & fastMask);
-    output |= (tempMoves >> shift1 & MACROMASKS2) & emptySquares;
+    shift = 9;
+    MACROMASK = 0x007F7F7F7F7F7F7F;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones >> shift & fastMask);
+    tempMoves = shiftR(shiftR(shiftR(shiftR(shiftR(tempMoves)))));
+    output |= (tempMoves >> shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS3 & enemyStones;
-    tempMoves = (friendlyStones << shift1 & fastMask);
-    tempMoves |= (tempMoves << shift1 & fastMask);
-    tempMoves |= (tempMoves << shift1 & fastMask);
-    tempMoves |= (tempMoves << shift1 & fastMask);
-    tempMoves |= (tempMoves << shift1 & fastMask);
-    tempMoves |= (tempMoves << shift1 & fastMask);
-    output |= (tempMoves << shift1 & MACROMASKS3) & emptySquares;
+    MACROMASK = 0xFEFEFEFEFEFEFE00;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones << shift & fastMask);
+    tempMoves = shiftL(shiftL(shiftL(shiftL(shiftL(tempMoves)))));
+    output |= (tempMoves << shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS4 & enemyStones;
-    tempMoves = (friendlyStones >> shift2 & fastMask);
-    tempMoves |= (tempMoves >> shift2 & fastMask);
-    tempMoves |= (tempMoves >> shift2 & fastMask);
-    tempMoves |= (tempMoves >> shift2 & fastMask);
-    tempMoves |= (tempMoves >> shift2 & fastMask);
-    tempMoves |= (tempMoves >> shift2 & fastMask);
-    output |= (tempMoves >> shift2 & MACROMASKS4) & emptySquares;
+    shift = 8;
+    MACROMASK = 0xFFFFFFFFFFFFFFFF;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones >> shift & fastMask);
+    tempMoves = shiftR(shiftR(shiftR(shiftR(shiftR(tempMoves)))));
+    output |= (tempMoves >> shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS5 & enemyStones;
-    tempMoves = (friendlyStones << shift2 & fastMask);
-    tempMoves |= (tempMoves << shift2 & fastMask);
-    tempMoves |= (tempMoves << shift2 & fastMask);
-    tempMoves |= (tempMoves << shift2 & fastMask);
-    tempMoves |= (tempMoves << shift2 & fastMask);
-    tempMoves |= (tempMoves << shift2 & fastMask);
-    output |= (tempMoves << shift2 & MACROMASKS5) & emptySquares;
+    MACROMASK = 0xFFFFFFFFFFFFFFFF;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones << shift & fastMask);
+    tempMoves = shiftL(shiftL(shiftL(shiftL(shiftL(tempMoves)))));
+    output |= (tempMoves << shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS6 & enemyStones;
-    tempMoves = (friendlyStones >> shift3 & fastMask);
-    tempMoves |= (tempMoves >> shift3 & fastMask);
-    tempMoves |= (tempMoves >> shift3 & fastMask);
-    tempMoves |= (tempMoves >> shift3 & fastMask);
-    tempMoves |= (tempMoves >> shift3 & fastMask);
-    tempMoves |= (tempMoves >> shift3 & fastMask);
-    output |= (tempMoves >> shift3 & MACROMASKS6) & emptySquares;
+    shift = 7;
+    MACROMASK = 0x00FEFEFEFEFEFEFE;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones >> shift & fastMask);
+    tempMoves = shiftR(shiftR(shiftR(shiftR(shiftR(tempMoves)))));
+    output |= (tempMoves >> shift & MACROMASK) & emptySquares;
 
-    fastMask = MACROMASKS7 & enemyStones;
-    tempMoves = (friendlyStones << shift3 & fastMask);
-    tempMoves |= (tempMoves << shift3 & fastMask);
-    tempMoves |= (tempMoves << shift3 & fastMask);
-    tempMoves |= (tempMoves << shift3 & fastMask);
-    tempMoves |= (tempMoves << shift3 & fastMask);
-    tempMoves |= (tempMoves << shift3 & fastMask);
-    output |= (tempMoves << shift3 & MACROMASKS7) & emptySquares;
+    MACROMASK = 0x7F7F7F7F7F7F7F00;
+    fastMask = MACROMASK & enemyStones;
+    tempMoves = (friendlyStones << shift & fastMask);
+    tempMoves = shiftL(shiftL(shiftL(shiftL(shiftL(tempMoves)))));
+    output |= (tempMoves << shift & MACROMASK) & emptySquares;
 
-    // These builtin_expects add about 1 million nodes/s
+    return output;
+}
+
+// These functions need to be fast.
+// This function is 400 instructions. Ignoring the loop, this should take 100 cycles on an M1 mac
+// Ignoring branches this should take 1/(3.2 * 10 ^ 7) seconds
+__attribute__((always_inline)) void getAllLegalMoves(Position * pos, int8_t ** mlPointer) {
+
+    // Used later in the function
+    bool temp;
+    int8_t * originalPointer = *mlPointer;
+
+    uint64_t output = getAllLegalMovesMask(pos);
+
     // Worst case is the amount of squares set
-    while(__builtin_expect(output, 1)) {
+    for(; output; output &= (output-1)) {
         *(*mlPointer)++ = __builtin_ctzl(output);
-        // Clear the least significant set bit.
-        output &= (output-1);
     }
     // This is a branchless way of setting the first element to -1 if there are no items in the array.
     temp = (*mlPointer == originalPointer);
-    *(*mlPointer) = (temp) ? -1 : *(*mlPointer);
+    *(*mlPointer) = temp ? -1 : *(*mlPointer);
     *(mlPointer) += temp;
 }
 
-bool doMove(Position * pos, int8_t square) {
+// This function is 600 instructions. Ignoring the loop, this should take 150 cycles on an M1 mac
+// Ignoring branches this should take 1.5/(3.2 * 10 ^ 7) seconds
+__attribute__((always_inline)) bool doMove(Position * pos, int8_t square) {
     // Toggle the turn
     pos->turn = !pos->turn;
 
@@ -278,103 +259,72 @@ bool doMove(Position * pos, int8_t square) {
     pos->team[BLACK] |= ((ONE64 & !pos->turn) << square);
     pos->team[WHITE] |= ((ONE64 & pos->turn) << square);
 
-    const uint64_t MACROMASKS0 = 0x7F7F7F7F7F7F7F7F;
-    const uint64_t MACROMASKS1 = 0xFEFEFEFEFEFEFEFE;
-    const uint64_t MACROMASKS2 = 0x007F7F7F7F7F7F7F;
-    const uint64_t MACROMASKS3 = 0xFEFEFEFEFEFEFE00; 
-    const uint64_t MACROMASKS4 = 0xFFFFFFFFFFFFFFFF;
-    const uint64_t MACROMASKS5 = 0xFFFFFFFFFFFFFFFF;
-    const uint64_t MACROMASKS6 = 0x00FEFEFEFEFEFEFE;
-    const uint64_t MACROMASKS7 = 0x7F7F7F7F7F7F7F00;
-
     uint64_t fastMask;
-    const uint8_t shift0 = 1;
-    const uint8_t shift1 = 9;
-    const uint8_t shift2 = 8;
-    const uint8_t shift3 = 7;
-    uint64_t tempOutput;
-    
-    fastMask = MACROMASKS0 & enemyStones;
-    tempOutput = (piecePlaced >> shift0 & fastMask);
-    tempOutput |= (tempOutput >> shift0 & fastMask);
-    tempOutput |= (tempOutput >> shift0 & fastMask);
-    tempOutput |= (tempOutput >> shift0 & fastMask);
-    tempOutput |= (tempOutput >> shift0 & fastMask);
-    tempOutput |= (tempOutput >> shift0 & fastMask);
-    ifCaptured = (tempOutput >> shift0 & MACROMASKS0) & friendlyStones;
+    register uint64_t tempOutput asm("x9");
+
+    register int8_t shift asm("x10");
+    shift = 1;
+    register uint64_t MACROMASK asm("x11");
+    MACROMASK = 0x7F7F7F7F7F7F7F7F;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced >> shift & fastMask);
+    tempOutput = shiftR(shiftR(shiftR(shiftR(shiftR(tempOutput)))));
+    ifCaptured = (tempOutput >> shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS1 & enemyStones;
-    tempOutput = (piecePlaced << shift0 & fastMask);
-    tempOutput |= (tempOutput << shift0 & fastMask);
-    tempOutput |= (tempOutput << shift0 & fastMask);
-    tempOutput |= (tempOutput << shift0 & fastMask);
-    tempOutput |= (tempOutput << shift0 & fastMask);
-    tempOutput |= (tempOutput << shift0 & fastMask);
-    ifCaptured = (tempOutput << shift0 & MACROMASKS1) & friendlyStones;
+    MACROMASK = 0xFEFEFEFEFEFEFEFE;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced << shift & fastMask);
+    tempOutput = shiftL(shiftL(shiftL(shiftL(shiftL(tempOutput)))));
+    ifCaptured = (tempOutput << shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS2 & enemyStones;
-    tempOutput = (piecePlaced >> shift1 & fastMask);
-    tempOutput |= (tempOutput >> shift1 & fastMask);
-    tempOutput |= (tempOutput >> shift1 & fastMask);
-    tempOutput |= (tempOutput >> shift1 & fastMask);
-    tempOutput |= (tempOutput >> shift1 & fastMask);
-    tempOutput |= (tempOutput >> shift1 & fastMask);
-    ifCaptured = (tempOutput >> shift1 & MACROMASKS2) & friendlyStones;
+    shift = 9;
+    MACROMASK = 0x007F7F7F7F7F7F7F;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced >> shift & fastMask);
+    tempOutput = shiftR(shiftR(shiftR(shiftR(shiftR(tempOutput)))));
+    ifCaptured = (tempOutput >> shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS3 & enemyStones;
-    tempOutput = (piecePlaced << shift1 & fastMask);
-    tempOutput |= (tempOutput << shift1 & fastMask);
-    tempOutput |= (tempOutput << shift1 & fastMask);
-    tempOutput |= (tempOutput << shift1 & fastMask);
-    tempOutput |= (tempOutput << shift1 & fastMask);
-    tempOutput |= (tempOutput << shift1 & fastMask);
-    ifCaptured = (tempOutput << shift1 & MACROMASKS3) & friendlyStones;
+    MACROMASK = 0xFEFEFEFEFEFEFE00;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced << shift & fastMask);
+    tempOutput = shiftL(shiftL(shiftL(shiftL(shiftL(tempOutput)))));
+    ifCaptured = (tempOutput << shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS4 & enemyStones;
-    tempOutput = (piecePlaced >> shift2 & fastMask);
-    tempOutput |= (tempOutput >> shift2 & fastMask);
-    tempOutput |= (tempOutput >> shift2 & fastMask);
-    tempOutput |= (tempOutput >> shift2 & fastMask);
-    tempOutput |= (tempOutput >> shift2 & fastMask);
-    tempOutput |= (tempOutput >> shift2 & fastMask);
-    ifCaptured = (tempOutput >> shift2 & MACROMASKS4) & friendlyStones;
+    shift = 8;
+    MACROMASK = 0xFFFFFFFFFFFFFFFF;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced >> shift & fastMask);
+    tempOutput = shiftR(shiftR(shiftR(shiftR(shiftR(tempOutput)))));
+    ifCaptured = (tempOutput >> shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS5 & enemyStones;
-    tempOutput = (piecePlaced << shift2 & fastMask);
-    tempOutput |= (tempOutput << shift2 & fastMask);
-    tempOutput |= (tempOutput << shift2 & fastMask);
-    tempOutput |= (tempOutput << shift2 & fastMask);
-    tempOutput |= (tempOutput << shift2 & fastMask);
-    tempOutput |= (tempOutput << shift2 & fastMask);
-    ifCaptured = (tempOutput << shift2 & MACROMASKS5) & friendlyStones;
+    MACROMASK = 0xFFFFFFFFFFFFFFFF;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced << shift & fastMask);
+    tempOutput = shiftL(shiftL(shiftL(shiftL(shiftL(tempOutput)))));
+    ifCaptured = (tempOutput << shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS6 & enemyStones;
-    tempOutput = (piecePlaced >> shift3 & fastMask);
-    tempOutput |= (tempOutput >> shift3 & fastMask);
-    tempOutput |= (tempOutput >> shift3 & fastMask);
-    tempOutput |= (tempOutput >> shift3 & fastMask);
-    tempOutput |= (tempOutput >> shift3 & fastMask);
-    tempOutput |= (tempOutput >> shift3 & fastMask);
-    ifCaptured = (tempOutput >> shift3 & MACROMASKS6) & friendlyStones;
+    shift = 7;
+    MACROMASK = 0x00FEFEFEFEFEFEFE;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced >> shift & fastMask);
+    tempOutput = shiftR(shiftR(shiftR(shiftR(shiftR(tempOutput)))));
+    ifCaptured = (tempOutput >> shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    fastMask = MACROMASKS7 & enemyStones;
-    tempOutput = (piecePlaced << shift3 & fastMask);
-    tempOutput |= (tempOutput << shift3 & fastMask);
-    tempOutput |= (tempOutput << shift3 & fastMask);
-    tempOutput |= (tempOutput << shift3 & fastMask);
-    tempOutput |= (tempOutput << shift3 & fastMask);
-    tempOutput |= (tempOutput << shift3 & fastMask);
-    ifCaptured = (tempOutput << shift3 & MACROMASKS7) & friendlyStones;
+    MACROMASK = 0x7F7F7F7F7F7F7F00;
+    fastMask = MACROMASK & enemyStones;
+    tempOutput = (piecePlaced << shift & fastMask);
+    tempOutput = shiftL(shiftL(shiftL(shiftL(shiftL(tempOutput)))));
+    ifCaptured = (tempOutput << shift & MACROMASK) & friendlyStones;
     output |= (ifCaptured ? tempOutput : 0);
 
-    __builtin_prefetch(&(pos->occupied));
+    __builtin_prefetch(&(pos->occupied)); // Adds roughly 2MM Nodes/s
     pos->team[BLACK] ^= output;
     pos->team[WHITE] ^= output;
 
